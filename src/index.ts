@@ -1,3 +1,7 @@
+import dotenv from 'dotenv';
+// Load env variables first, before other imports
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import connectDB from './services/mongoDB';
@@ -8,9 +12,9 @@ const PORT = process.env.PORT || 4001;
 
 // Enable CORS with specific origin
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+    origin: '*',  // More permissive for development
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Accept']
 }));
 
 app.use(express.json());
@@ -18,12 +22,13 @@ app.use(express.json());
 // Routes
 app.get('/api/patients', async (req, res) => {
     try {
-        console.log('Fetching patients from database...');
+        console.log('🔍 Fetching patients from database...');
         const patients = await PatientModel.find();
-        console.log(`Found ${patients.length} patients`);
+        console.log(`✅ Found ${patients.length} patients`);
+        console.log('Sample patient:', patients[0]); // Log a sample patient
         res.json(patients);
     } catch (error: any) {
-        console.error('Error fetching patients:', error);
+        console.error('❌ Error fetching patients:', error);
         res.status(500).json({ 
             message: 'Server error', 
             error: error?.message || 'Unknown error'
