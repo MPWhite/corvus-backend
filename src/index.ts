@@ -19,7 +19,8 @@ const PORT = process.env.PORT || 4001;
 app.use(cors({
     origin: '*',  // More permissive for development
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Accept']
+    allowedHeaders: ['Content-Type', 'Accept'],
+    credentials: true, // Allow cookies and credentials
 }));
 
 app.use(express.json());
