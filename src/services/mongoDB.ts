@@ -18,7 +18,7 @@ const connectDB = async () => {
             PWD: process.cwd()
         });
 
-        const uri = process.env.MONGO_URI;
+        const uri = 'mongodb+srv://Marc1:1Papazian1@corvuscluster.dzrhi.mongodb.net/corvus?retryWrites=true&w=majority';
         if (!uri) {
             throw new Error('MONGO_URI is not defined in environment variables');
         }
