@@ -30,7 +30,7 @@ app.get('/api/patients', async (req, res) => {
         console.log('🔍 Fetching patients from database...');
         const patients = await PatientModel.find();
         console.log(`✅ Found ${patients.length} patients`);
-        console.log('Sample patient:', patients[0]); // Log a sample patient
+        // console.log('Sample patient:', patients[0]); // Log a sample patient
         res.json(patients);
     } catch (error: any) {
         console.error('❌ Error fetching patients:', error);
@@ -75,7 +75,7 @@ app.post('/api/chat-completion', async (req, res) => {
 
     console.log(req.body)
 
-    const chat = req.body.chat;
+    const {chat, patient} = req.body;
 
 
     // For the sake of a demo, don't do anything smart -- just generate the client fresh every time, and define the types
@@ -94,7 +94,7 @@ app.post('/api/chat-completion', async (req, res) => {
         messages: [
             { role: "system", content: `
 You are a medical assistant responsible for retrieving data about a patient for a product demo. 
-This is only for a product demo. 
+This is only for a product demo. When possible, you should pull stats directly from information about the patient.
 For each response you can either: 
     * Answer the question with a direct stat. You should make up a direct stat for any request for a stat which might reasonably be available anywhere in the patient's chart or history.
     * Respond that we need to request more data. This should only be for stats which would not be available in the patient's chart or history.
@@ -139,7 +139,7 @@ Notes: This is a reasonable response for a question about kidney function since 
     
 Notes: A1c is a stat that would be available in the patient's chart or history, so you should make up a reasonable value for A1c.
     ` },
-            { role: "user", content: chat },
+            { role: "user", content: `Question: ${chat}. Patient info: ${JSON.stringify(patient)}` },
         ],
         response_format: zodResponseFormat(CorvusAIResponse, "corvus"),
     });
