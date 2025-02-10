@@ -1,11 +1,18 @@
 import mongoose, { Document, Model } from 'mongoose';
 
-// Define interfaces for the document
+// Type definitions
+type UrgencyLevel = 'low' | 'medium' | 'high' | 'critical';
+type ReferralType = 'self' | 'external' | 'internal';
+type ReviewStatus = 'PENDING_MA_REVIEW' | 'READY_FOR_SURGEON' | 'NEEDS_MORE_INFO' | 'SURGEON_APPROVED' | 'SCHEDULED' | 'REJECTED';
+
+// Interfaces for nested documents
 interface ISurgeryRequirement {
     name: string;
     value: any;
     required: any;
     met: boolean;
+    description: string;
+    critical: boolean;
 }
 
 interface IDocument {
@@ -13,6 +20,16 @@ interface IDocument {
     received: boolean;
     url?: string;
     dateReceived?: Date;
+    status?: 'pending' | 'received' | 'expired';
+    requestedDate?: Date;
+}
+
+interface IMedication {
+    name: string;
+    dosage: string;
+    frequency: string;
+    startDate: Date;
+    prescribedBy: string;
 }
 
 interface INote {
@@ -23,7 +40,58 @@ interface INote {
     type: 'general' | 'surgical' | 'medical' | 'requirement';
 }
 
-interface IPatient extends Document {
+interface ILabResult {
+    testName: string;
+    date: Date;
+    result: string;
+    unit: string;
+    isAbnormal: boolean;
+}
+
+interface ISurgicalHistory {
+    procedure: string;
+    date: Date;
+    surgeon: string;
+    facility: string;
+    complications?: string;
+}
+
+interface IRequiredAction {
+    id: string;
+    type: string;
+    description: string;
+    dueDate: Date;
+    assignedTo: string;
+    status: 'pending' | 'completed';
+}
+
+// Add these interfaces at the top
+interface Medication {
+    name: string;
+    dosage: string;
+    frequency: string;
+    startDate: Date;
+    prescribedBy: string;
+}
+
+interface LabResult {
+    testName: string;
+    date: Date;
+    result: string;
+    unit: string;
+    isAbnormal: boolean;
+}
+
+interface SurgicalHistory {
+    procedure: string;
+    date: Date;
+    surgeon: string;
+    facility: string;
+    complications?: string;
+}
+
+// Main Patient Interface
+export interface IPatient extends Document {
     name: string;
     age: number;
     gender: 'male' | 'female';
@@ -37,29 +105,54 @@ interface IPatient extends Document {
     surgeryType: string;
     surgeryRequirements: ISurgeryRequirement[];
     medicalHistory: string[];
-    medications: string[];
+    medications: Medication[];
     requiredDocuments: IDocument[];
     lastUpdated: Date;
     notes: INote[];
     consultDate: Date;
-    urgencyLevel: 'low' | 'medium' | 'high' | 'critical';
+    urgencyLevel: UrgencyLevel;
     priorityScore: number;
+    ehrId: string;
+    referralType: ReferralType;
+    reviewStatus: ReviewStatus;
+    referralDate?: Date;
+    scheduledDate?: Date;
+    reviewedAt?: Date;
+    reviewNotes: INote[];
+    requiredActions: IRequiredAction[];
+    surgicalHistory: SurgicalHistory[];
+    labResults: LabResult[];
     calculatePriorityScore: () => number;
-    referralType: 'self' | 'external' | 'internal';
 }
 
+// Schema Definitions
 const surgeryRequirementSchema = new mongoose.Schema({
     name: String,
     value: mongoose.Schema.Types.Mixed,
     required: mongoose.Schema.Types.Mixed,
-    met: Boolean
+    met: Boolean,
+    description: String,
+    critical: Boolean
 });
 
 const documentSchema = new mongoose.Schema({
     type: String,
     received: Boolean,
     url: String,
-    dateReceived: Date
+    dateReceived: Date,
+    status: {
+        type: String,
+        enum: ['pending', 'received', 'expired']
+    },
+    requestedDate: Date
+});
+
+const medicationSchema = new mongoose.Schema({
+    name: String,
+    dosage: String,
+    frequency: String,
+    startDate: Date,
+    prescribedBy: String
 });
 
 const noteSchema = new mongoose.Schema({
@@ -73,6 +166,36 @@ const noteSchema = new mongoose.Schema({
     }
 });
 
+const labResultSchema = new mongoose.Schema({
+    testName: String,
+    date: Date,
+    result: String,
+    unit: String,
+    isAbnormal: Boolean
+});
+
+const surgicalHistorySchema = new mongoose.Schema({
+    procedure: String,
+    date: Date,
+    surgeon: String,
+    facility: String,
+    complications: String
+});
+
+const requiredActionSchema = new mongoose.Schema({
+    id: String,
+    type: String,
+    description: String,
+    dueDate: Date,
+    assignedTo: String,
+    status: {
+        type: String,
+        enum: ['pending', 'completed'],
+        default: 'pending'
+    }
+});
+
+// Main Patient Schema
 const patientSchema = new mongoose.Schema({
     name: String,
     age: Number,
@@ -90,7 +213,13 @@ const patientSchema = new mongoose.Schema({
     surgeryType: String,
     surgeryRequirements: [surgeryRequirementSchema],
     medicalHistory: [String],
-    medications: [String],
+    medications: [{
+        name: String,
+        dosage: String,
+        frequency: String,
+        startDate: Date,
+        prescribedBy: String
+    }],
     requiredDocuments: [documentSchema],
     lastUpdated: Date,
     notes: [noteSchema],
@@ -102,32 +231,51 @@ const patientSchema = new mongoose.Schema({
     urgencyLevel: {
         type: String,
         enum: ['low', 'medium', 'high', 'critical'],
-        required: true,
         default: 'medium'
     },
     priorityScore: {
         type: Number,
         min: 1,
         max: 100,
-        required: true,
         default: 50
     },
     ehrId: {
         type: String,
-        required: true,
-        default: () => Math.random().toString(36).substr(2, 9) // Generate a random ID
+        default: () => Math.random().toString(36).substr(2, 9)
     },
     referralType: {
         type: String,
         enum: ['self', 'external', 'internal'],
-        required: true,
         default: 'external'
-    }
+    },
+    reviewStatus: {
+        type: String,
+        enum: ['PENDING_MA_REVIEW', 'READY_FOR_SURGEON', 'NEEDS_MORE_INFO', 'SURGEON_APPROVED', 'SCHEDULED', 'REJECTED'],
+        default: 'PENDING_MA_REVIEW'
+    },
+    referralDate: Date,
+    scheduledDate: Date,
+    reviewedAt: Date,
+    reviewNotes: [noteSchema],
+    requiredActions: [requiredActionSchema],
+    surgicalHistory: [{
+        procedure: String,
+        date: Date,
+        surgeon: String,
+        facility: String,
+        complications: String
+    }],
+    labResults: [{
+        testName: String,
+        date: Date,
+        result: String,
+        unit: String,
+        isAbnormal: Boolean
+    }]
 });
 
-// Add a method to calculate priority score
-patientSchema.methods.calculatePriorityScore = function(this: IPatient): number {
-    // Base urgency scores (max 100)
+// Priority Score Calculation
+patientSchema.methods.calculatePriorityScore = function(this: IPatient & Document): number {
     const urgencyScores = {
         'critical': 100,
         'high': 75,
@@ -135,46 +283,37 @@ patientSchema.methods.calculatePriorityScore = function(this: IPatient): number 
         'low': 25
     };
     
-    // Referral type bonus (max 20)
     const referralScores = {
         'internal': 20,
         'external': 10,
         'self': 5
     };
     
-    // Calculate base score from urgency (40% weight)
-    const urgencyScore = urgencyScores[this.urgencyLevel] || 50;
-    
-    // Calculate waiting time score (30% weight)
+    const urgencyScore = urgencyScores[this.urgencyLevel as UrgencyLevel] || 50;
     const daysWaiting = Math.floor((Date.now() - new Date(this.consultDate).getTime()) / (1000 * 60 * 60 * 24));
-    const waitingScore = Math.min(daysWaiting * 2, 100); // 2 points per day, max 100
+    const waitingScore = Math.min(daysWaiting * 2, 100);
     
-    // Calculate document readiness score (15% weight)
     const documentsReceived = this.requiredDocuments.filter(doc => doc.received).length;
     const totalDocuments = this.requiredDocuments.length;
-    const documentScore = (documentsReceived / totalDocuments) * 100;
+    const documentScore = totalDocuments > 0 ? (documentsReceived / totalDocuments) * 100 : 0;
     
-    // Calculate requirements score (15% weight)
     const requirementsMet = this.surgeryRequirements.filter(req => req.met).length;
     const totalRequirements = this.surgeryRequirements.length;
-    const requirementsScore = (requirementsMet / totalRequirements) * 100;
+    const requirementsScore = totalRequirements > 0 ? (requirementsMet / totalRequirements) * 100 : 0;
     
-    // Calculate final weighted score
     const finalScore = Math.round(
         (urgencyScore * 0.4) +
         (waitingScore * 0.3) +
         (documentScore * 0.15) +
         (requirementsScore * 0.15) +
-        (referralScores[this.referralType] || 0)
+        (referralScores[this.referralType as ReferralType] || 0)
     );
     
-    // Ensure score is between 1 and 100
     this.priorityScore = Math.min(Math.max(finalScore, 1), 100);
     return this.priorityScore;
 };
 
-// Automatically calculate priority score before saving
-patientSchema.pre('save', function(this: IPatient, next) {
+patientSchema.pre('save', function(this: IPatient & Document, next) {
     this.calculatePriorityScore();
     next();
 });
