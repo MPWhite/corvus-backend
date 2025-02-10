@@ -14,10 +14,14 @@ const openai_1 = __importDefault(require("openai"));
 const zod_1 = require("openai/helpers/zod");
 const zod_2 = require("zod");
 const app = (0, express_1.default)();
-const PORT = process.env.PORT || 4001;
+// Convert PORT to number explicitly
+const PORT = parseInt(process.env.PORT || '4001', 10);
 // Enable CORS with specific origin
 app.use((0, cors_1.default)({
-    origin: '*',
+    origin: [
+        'https://your-vercel-url.vercel.app',
+        'http://localhost:5173'
+    ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Accept']
 }));
@@ -28,7 +32,6 @@ app.get('/api/patients', async (req, res) => {
         console.log('🔍 Fetching patients from database...');
         const patients = await PatientModel_1.default.find();
         console.log(`✅ Found ${patients.length} patients`);
-        // console.log('Sample patient:', patients[0]); // Log a sample patient
         res.json(patients);
     }
     catch (error) {
@@ -142,6 +145,14 @@ const startServer = async () => {
         app.listen(PORT, () => {
             console.log(`✅ Server running on port ${PORT}`);
             console.log(`📍 API available at http://localhost:${PORT}/api`);
+        }).on('error', (err) => {
+            if (err.code === 'EADDRINUSE') {
+                console.log(`❌ Port ${PORT} is busy, trying ${PORT + 1}...`);
+                app.listen(PORT + 1);
+            }
+            else {
+                console.error('❌ Server startup error:', err);
+            }
         });
     }
     catch (error) {
