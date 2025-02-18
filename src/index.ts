@@ -9,8 +9,8 @@ import PatientModel from './services/PatientModel';
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
-
-
+import DataSyncModel from './services/AIAssistantModel';
+import mongoose from 'mongoose';
 
 const app = express();
 // Convert PORT to number explicitly
@@ -36,10 +36,15 @@ app.get('/api/patients', async (req, res) => {
         console.log(`✅ Found ${patients.length} patients`);
         res.json(patients);
     } catch (error: any) {
-        console.error('❌ Error fetching patients:', error);
+        console.error('❌ Error details:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+        });
         res.status(500).json({ 
             message: 'Server error', 
-            error: error?.message || 'Unknown error'
+            error: error?.message || 'Unknown error',
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 });
@@ -154,6 +159,20 @@ Notes: A1c is a stat that would be available in the patient's chart or history, 
     res.json({ response });
 })
 
+// Add this with other routes
+app.get('/api/patients/:patientId/datasyncs', async (req, res) => {
+    try {
+        const { patientId } = req.params;
+        console.log('Fetching data syncs for patient:', patientId);
+        const dataSyncs = await DataSyncModel.find({ patientId });
+        console.log('Found data syncs:', dataSyncs.length);
+        res.json(dataSyncs);
+    } catch (error) {
+        console.error('Error fetching data syncs:', error);
+        res.status(500).json({ error: 'Failed to fetch data syncs' });
+    }
+});
+
 // Add a test route
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date() });
@@ -183,3 +202,8 @@ const startServer = async () => {
 };
 
 startServer();
+
+// Add MongoDB connection error handling
+mongoose.connection.on('error', (error) => {
+    console.error('MongoDB connection error:', error);
+});

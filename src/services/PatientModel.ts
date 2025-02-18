@@ -1,4 +1,4 @@
-import mongoose, { Document, Model } from 'mongoose';
+import mongoose, { Document, Model, Types } from 'mongoose';
 
 // Type definitions
 type UrgencyLevel = 'low' | 'medium' | 'high' | 'critical';
@@ -90,8 +90,34 @@ interface SurgicalHistory {
     complications?: string;
 }
 
+// Add these interfaces to the existing types
+interface AIInsight {
+    id: string;
+    timestamp: Date;
+    category: 'risk' | 'workflow' | 'medical' | 'administrative';
+    confidence: number;  // 0-1
+    content: string;
+    source: string;     // e.g., 'medical_history', 'lab_results', 'workflow_patterns'
+    priority: 'low' | 'medium' | 'high';
+    status: 'active' | 'resolved' | 'dismissed';
+    relatedFields?: string[];
+}
+
+interface AIRecommendation {
+    id: string;
+    timestamp: Date;
+    type: 'action' | 'alert' | 'suggestion';
+    title: string;
+    description: string;
+    priority: 'low' | 'medium' | 'high';
+    status: 'pending' | 'accepted' | 'rejected';
+    dueDate?: Date;
+    assignedTo?: string;
+}
+
 // Main Patient Interface
 export interface IPatient extends Document {
+    _id: Types.ObjectId;
     name: string;
     age: number;
     gender: 'male' | 'female';
@@ -103,26 +129,106 @@ export interface IPatient extends Document {
     referringProvider: string;
     referralNotes: string;
     surgeryType: string;
-    surgeryRequirements: ISurgeryRequirement[];
+    surgeryRequirements: Array<{
+        name: string;
+        value: string | number | boolean;
+        required: string | boolean;
+        met: boolean;
+        description: string;
+        critical: boolean;
+    }>;
     medicalHistory: string[];
-    medications: Medication[];
-    requiredDocuments: IDocument[];
+    medications: Array<{
+        name: string;
+        dosage: string;
+        frequency: string;
+        startDate: Date;
+        prescribedBy: string;
+    }>;
+    requiredDocuments: Array<{
+        type: string;
+        received: boolean;
+        status?: 'pending' | 'received' | 'expired';
+        requestedDate?: Date;
+    }>;
     lastUpdated: Date;
-    notes: INote[];
+    notes: Array<{
+        content: string;
+        author: string;
+        timestamp: Date;
+        type: 'general' | 'surgical' | 'medical' | 'requirement';
+    }>;
     consultDate: Date;
-    urgencyLevel: UrgencyLevel;
+    urgencyLevel: 'low' | 'medium' | 'high' | 'critical';
     priorityScore: number;
     ehrId: string;
-    referralType: ReferralType;
-    reviewStatus: ReviewStatus;
+    referralType: 'self' | 'external' | 'internal';
+    reviewStatus: string;
+    insuranceVerified?: boolean;
     referralDate?: Date;
     scheduledDate?: Date;
     reviewedAt?: Date;
-    reviewNotes: INote[];
-    requiredActions: IRequiredAction[];
-    surgicalHistory: SurgicalHistory[];
-    labResults: LabResult[];
+    reviewNotes: Array<{
+        content: string;
+        author: string;
+        timestamp: Date;
+        type: 'general' | 'surgical' | 'medical' | 'requirement';
+    }>;
+    requiredActions: Array<{
+        id: string;
+        type: string;
+        description: string;
+        dueDate: Date;
+        assignedTo: string;
+        status: 'pending' | 'completed';
+    }>;
+    surgicalHistory: Array<{
+        procedure: string;
+        date: Date;
+        surgeon: string;
+        facility: string;
+        complications?: string;
+    }>;
+    labResults: Array<{
+        testName: string;
+        date: Date;
+        result: string;
+        unit: string;
+        isAbnormal: boolean;
+    }>;
     calculatePriorityScore: () => number;
+    aiData: {
+        insights: Array<{
+            id: string;
+            timestamp: Date;
+            category: 'risk' | 'workflow' | 'medical' | 'administrative';
+            confidence: number;
+            content: string;
+            source: string;
+            priority: 'low' | 'medium' | 'high';
+            status: 'active' | 'resolved' | 'dismissed';
+            relatedFields?: string[];
+        }>;
+        recommendations: Array<{
+            id: string;
+            timestamp: Date;
+            type: 'action' | 'alert' | 'suggestion';
+            title: string;
+            description: string;
+            priority: 'low' | 'medium' | 'high';
+            status: 'pending' | 'accepted' | 'rejected';
+            dueDate?: Date;
+            assignedTo?: string;
+        }>;
+        lastAnalysis: Date;
+        riskScore: number;
+        workflowEfficiency: number;
+        patternMatches: Array<{
+            pattern: string;
+            confidence: number;
+            description: string;
+        }>;
+    };
 }
 
 // Schema Definitions
@@ -271,7 +377,59 @@ const patientSchema = new mongoose.Schema({
         result: String,
         unit: String,
         isAbnormal: Boolean
-    }]
+    }],
+    aiData: {
+        insights: [new mongoose.Schema<AIInsight>({
+            id: String,
+            timestamp: Date,
+            category: {
+                type: String,
+                enum: ['risk', 'workflow', 'medical', 'administrative']
+            },
+            confidence: Number,
+            content: String,
+            source: String,
+            priority: {
+                type: String,
+                enum: ['low', 'medium', 'high']
+            },
+            status: {
+                type: String,
+                enum: ['active', 'resolved', 'dismissed']
+            },
+            relatedFields: [String]
+        })],
+        
+        recommendations: [new mongoose.Schema<AIRecommendation>({
+            id: String,
+            timestamp: Date,
+            type: {
+                type: String,
+                enum: ['action', 'alert', 'suggestion']
+            },
+            title: String,
+            description: String,
+            priority: {
+                type: String,
+                enum: ['low', 'medium', 'high']
+            },
+            status: {
+                type: String,
+                enum: ['pending', 'accepted', 'rejected']
+            },
+            dueDate: Date,
+            assignedTo: String
+        })],
+
+        lastAnalysis: Date,
+        riskScore: Number,
+        workflowEfficiency: Number,  // 0-100 score based on processing time
+        patternMatches: [{
+            pattern: String,
+            confidence: Number,
+            description: String
+        }]
+    }
 });
 
 // Priority Score Calculation
